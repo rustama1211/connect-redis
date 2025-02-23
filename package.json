@@ -10,29 +10,17 @@
     "Marc Harter <wavded@gmail.com>"
   ],
   "license": "MIT",
-  "type": "module",
-  "main": "./dist/connect-redis-knex.cjs",
-  "module": "./dist/connect-redis-knex.js",
-  "types": "./dist/connect-redis-knex.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/connect-redis-knex.d.ts",
-        "default": "./dist/connect-redis-knex.js"
-      },
-      "require": {
-        "types": "./dist/connect-redis-knex.d.cts",
-        "default": "./dist/connect-redis-knex.cjs"
-      }
-    }
-  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "src/**/*"
+  ],
   "scripts": {
-    "prepublishOnly": "vite build",
-    "build": "vite build",
-    "test": "vitest run --silent --coverage",
-    "lint": "tsc --noemit && eslint --max-warnings 0 testdata *.ts",
-    "fmt": "prettier --write .",
-    "fmt-check": "prettier --check .",
+    "build": "tsc",
+    "test": "NODE_OPTIONS=--enable-source-maps node --test",
+    "lint": "eslint src/ src/",
+    "lint-fix": "eslint --fix src/ test/",
     "release": "release-it",
     "prepare": "husky"
   },
@@ -40,14 +28,16 @@
     "type": "git",
     "url": "git+ssh://git@github.com:rustama1211/connect-redis.git"
   },
+  "dependencies": {
+    "knex": "git@github.com:rustama1211/knex.git#v3.1.2"
+  },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@types/eslint__js": "^8.42.3",
     "@types/express-session": "^1.18.1",
     "@types/node": "^20.17.8",
-    "@vitest/coverage-v8": "^2.1.6",
     "eslint": "^9.15.0",
-    "eslint-config-prettier": "^9.1.0",
+    "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.1",
     "express-session": "^1.18.1",
     "ioredis": "^5.4.1",
@@ -57,10 +47,6 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.16.0",
-    "vite": "^6.0.1",
-    "vite-plugin-dts": "^4.3.0",
-    "vitest": "^2.1.6",
-    "knex": "git@github.com:rustama1211/knex.git#v3.1.2",
     "mysql": "^2.18.1",
     "pg": "^8.11.3",
     "sqlite3": "^5.1.6",
