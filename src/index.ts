@@ -180,10 +180,8 @@ export class RedisStore extends Store {
     let key = this.clientPrefix + this.prefix + sid
     try {
       let data = await this.client.get(key)
-      if (!data) {
-        data = (await this.db_get(key, cb)) as string | null
-        if (!data) return cb()
-      }
+      //data = (await this.db_get(key, cb)) as string | null
+      if (!data) return cb()
       return cb(null, await this.serializer.parse(data))
     } catch (err) {
       return cb(err)
