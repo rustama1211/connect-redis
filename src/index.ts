@@ -177,7 +177,7 @@ export class RedisStore extends Store {
   }
 
   async get(sid: string, cb = noop) {
-    let key = this.clientPrefix + this.prefix + sid
+    let key = this.prefix + sid
     try {
       let data = await this.client.get(key)
       //data = (await this.db_get(key, cb)) as string | null
@@ -189,7 +189,7 @@ export class RedisStore extends Store {
   }
 
   async set(sid: string, sess: SessionData, cb = noop) {
-    let key = this.clientPrefix + this.prefix + sid
+    let key = this.prefix + sid
     let ttl = this._getTTL(sess)
     try {
       let val = this.serializer.stringify(sess)
@@ -315,7 +315,7 @@ export class RedisStore extends Store {
   }
 
   async touch(sid: string, sess: SessionData, cb = noop) {
-    let key = this.clientPrefix + this.prefix + sid
+    let key = this.prefix + sid
     if (this.disableTouch || this.disableTTL) return cb()
     try {
       await this.client.expire(key, this._getTTL(sess))
@@ -344,7 +344,7 @@ export class RedisStore extends Store {
   }
 
   async destroy(sid: string, cb = noop) {
-    let key = this.clientPrefix + this.prefix + sid
+    let key = this.prefix + sid
     try {
       await this.client.del([key])
       await this.db_destroy(sid, cb)
