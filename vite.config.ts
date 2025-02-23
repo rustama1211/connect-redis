@@ -7,7 +7,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: "index.ts",
-      name: "connect-redis",
+      name: "connect-redis-knex",
       formats: ["es", "cjs"],
     },
     emptyOutDir: true,
@@ -25,7 +25,10 @@ export default defineConfig({
       rollupTypes: true,
       insertTypesEntry: true,
       afterBuild: () => {
-        copyFileSync("dist/connect-redis.d.ts", "dist/connect-redis.d.cts")
+        copyFileSync(
+          "dist/connect-redis-knex.d.ts",
+          "dist/connect-redis-knex.d.cts",
+        )
       },
     }),
   ],

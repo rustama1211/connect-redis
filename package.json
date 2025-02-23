@@ -11,18 +11,18 @@
   ],
   "license": "MIT",
   "type": "module",
-  "main": "./dist/connect-redis.cjs",
-  "module": "./dist/connect-redis.js",
-  "types": "./dist/connect-redis.d.ts",
+  "main": "./dist/connect-redis-knex.cjs",
+  "module": "./dist/connect-redis-knex.js",
+  "types": "./dist/connect-redis-knex.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/connect-redis.d.ts",
-        "default": "./dist/connect-redis.js"
+        "types": "./dist/connect-redis-knex.d.ts",
+        "default": "./dist/connect-redis-knex.js"
       },
       "require": {
-        "types": "./dist/connect-redis.d.cts",
-        "default": "./dist/connect-redis.cjs"
+        "types": "./dist/connect-redis-knex.d.cts",
+        "default": "./dist/connect-redis-knex.cjs"
       }
     }
   },
