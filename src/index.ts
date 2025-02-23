@@ -54,6 +54,7 @@ interface RedisStoreOptions {
 }
 
 let hasTableSession = false
+let checkSchemaHasCalled = false
 
 export class RedisStore extends Store {
   client: NormalizedRedisClient
@@ -101,7 +102,10 @@ export class RedisStore extends Store {
       options
 
     this.ready = (async () => {
-      if (!hasTableSession || !(await knex.schema.hasTable(tableName))) {
+      if (!hasTableSession) {
+        hasTableSession = await knex.schema.hasTable(tableName)
+      }
+      if (!hasTableSession) {
         if (!createTable) {
           throw new Error(`Missing ${tableName} table`)
         }
