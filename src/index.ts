@@ -536,6 +536,10 @@ export class RedisStore extends Store {
     let pattern = this.clientPrefix + this.prefix + "*"
     let keys = []
     for await (let key of this.client.scanIterator(pattern, this.scanCount)) {
+      if (this.clientPrefix.length) {
+        const regPattern = new RegExp("^" + this.clientPrefix)
+        key = key.replace(regPattern, "")
+      }
       keys.push(key)
     }
     return keys
