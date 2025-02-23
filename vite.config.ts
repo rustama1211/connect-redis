@@ -21,7 +21,7 @@ export default defineConfig({
   plugins: [
     // @ts-expect-error Type mismatch, revisit.
     dts({
-      include: ["index.ts"],
+      include: ["index.ts", "utils.ts"],
       rollupTypes: true,
       insertTypesEntry: true,
       afterBuild: () => {
