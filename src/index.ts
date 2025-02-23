@@ -39,6 +39,7 @@ interface AdditionalSessionField {
 interface RedisStoreOptions {
   client: any
   prefix?: string
+  clientPrefix?: string
   scanCount?: number
   serializer?: Serializer
   ttl?: number | {(sess: SessionData): number}
@@ -59,6 +60,7 @@ let checkSchemaHasCalled = false
 export class RedisStore extends Store {
   client: NormalizedRedisClient
   prefix: string
+  clientPrefix: string
   scanCount: number
   serializer: Serializer
   ttl: number | {(sess: SessionData): number}
@@ -72,6 +74,8 @@ export class RedisStore extends Store {
     super()
     this.prefix =
       incomingOptions.prefix == null ? "sess:" : incomingOptions.prefix
+    this.clientPrefix =
+      incomingOptions.clientPrefix == null ? "" : incomingOptions.clientPrefix
     this.scanCount = incomingOptions.scanCount || 100
     this.serializer = incomingOptions.serializer || JSON
     this.ttl = incomingOptions.ttl || 86400 // One day in seconds.
@@ -173,7 +177,7 @@ export class RedisStore extends Store {
   }
 
   async get(sid: string, cb = noop) {
-    let key = this.prefix + sid
+    let key = this.clientPrefix + this.prefix + sid
     try {
       let data = await this.client.get(key)
       if (!data) {
@@ -187,7 +191,7 @@ export class RedisStore extends Store {
   }
 
   async set(sid: string, sess: SessionData, cb = noop) {
-    let key = this.prefix + sid
+    let key = this.clientPrefix + this.prefix + sid
     let ttl = this._getTTL(sess)
     try {
       let val = this.serializer.stringify(sess)
@@ -313,7 +317,7 @@ export class RedisStore extends Store {
   }
 
   async touch(sid: string, sess: SessionData, cb = noop) {
-    let key = this.prefix + sid
+    let key = this.clientPrefix + this.prefix + sid
     if (this.disableTouch || this.disableTTL) return cb()
     try {
       await this.client.expire(key, this._getTTL(sess))
@@ -342,7 +346,7 @@ export class RedisStore extends Store {
   }
 
   async destroy(sid: string, cb = noop) {
-    let key = this.prefix + sid
+    let key = this.clientPrefix + this.prefix + sid
     try {
       await this.client.del([key])
       await this.db_destroy(sid, cb)
@@ -374,7 +378,7 @@ export class RedisStore extends Store {
   }
 
   async ids(cb = noop) {
-    let len = this.prefix.length
+    let len = (this.clientPrefix + this.prefix).length
     try {
       let keys = await this._getAllKeys()
       return cb(
@@ -387,7 +391,7 @@ export class RedisStore extends Store {
   }
 
   async all(cb = noop) {
-    let len = this.prefix.length
+    let len = (this.clientPrefix + this.prefix).length
     try {
       let keys = await this._getAllKeys()
       if (keys.length === 0) return cb(null, [])
@@ -531,7 +535,7 @@ export class RedisStore extends Store {
   }
 
   private async _getAllKeys() {
-    let pattern = this.prefix + "*"
+    let pattern = this.clientPrefix + this.prefix + "*"
     let keys = []
     for await (let key of this.client.scanIterator(pattern, this.scanCount)) {
       keys.push(key)
