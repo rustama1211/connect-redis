@@ -55,7 +55,6 @@ interface RedisStoreOptions {
 }
 
 let hasTableSession = false
-let checkSchemaHasCalled = false
 
 export class RedisStore extends Store {
   client: NormalizedRedisClient
