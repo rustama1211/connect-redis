@@ -35,6 +35,9 @@ interface Serializer {
 interface AdditionalSessionField {
   name: string
   type: string
+  isSaveValue?: boolean
+  // mapping field if exists
+  mappingField?: Record<string, string>
 }
 interface RedisStoreOptions {
   client: any
@@ -265,12 +268,37 @@ export class RedisStore extends Store {
           sess,
         ])
       } else if (isPostgres(knex) && parseFloat(knex.client.version) >= 9.2) {
+        // only handling newer postgresql
+        let extrafield: Array<Array<string>> = []
+
+        if (this.options.additionalSesionFields) {
+          this.options.additionalSesionFields.forEach((obj) => {
+            if ((session as any)[obj.name] && obj.isSaveValue) {
+              if (extrafield.length == 0) {
+                extrafield.push([obj.name])
+                extrafield.push([
+                  ["uuid", "json"].includes(obj.type) ? `?::${obj.type}` : "?",
+                ])
+              } else if (extrafield.length == 2) {
+                extrafield[0].push(obj.name)
+                extrafield[1].push(
+                  ["uuid", "json"].includes(obj.type) ? `?::${obj.type}` : "?",
+                )
+              }
+            }
+          })
+        }
+        let defaultValue = [sid, dbDate, sess]
+        if (extrafield.length > 0) {
+          extrafield[0].forEach((name) => {
+            defaultValue.push((session as any)[name])
+          })
+        }
         // postgresql optimized query
-        await knex.raw(getPostgresFastQuery(tableName, sidFieldName), [
-          sid,
-          dbDate,
-          sess,
-        ])
+        await knex.raw(
+          getPostgresFastQuery(tableName, sidFieldName),
+          defaultValue,
+        )
       } else if (isMySQL(knex)) {
         await knex.raw(getMysqlFastQuery(tableName, sidFieldName), [
           sid,

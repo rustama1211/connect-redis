@@ -66,10 +66,26 @@ export function dateAsISO(
  * @return {string}
  * @api private
  */
-export function getPostgresFastQuery(tablename: string, sidfieldname: string) {
+export function getPostgresFastQuery(
+  tablename: string,
+  sidfieldname: string,
+  extraFields?: Array<Array<string>>,
+) {
+  let fieldList = ""
+  let dataTypeList = ""
+  let extraFieldUpdate = ""
+  if (extraFields && extraFields.length == 2) {
+    fieldList = "," + extraFields[0].join(",")
+    dataTypeList = "," + extraFields[1].join(",")
+    let tmpExtraFields: Array<string> = []
+    extraFields[0].forEach((key) => {
+      tmpExtraFields.push(` ${key} = nv.${key}`)
+    })
+    extraFieldUpdate = "," + tmpExtraFields.join(",")
+  }
   return (
-    `with new_values (${sidfieldname}, expired, sess) as (` +
-    "  values (?, ?::timestamp with time zone, ?::json)" +
+    `with new_values (${sidfieldname}, expired, sess ${fieldList}) as (` +
+    `  values (?, ?::timestamp with time zone, ?::json ${dataTypeList})` +
     "), " +
     "upsert as " +
     "( " +
@@ -77,12 +93,13 @@ export function getPostgresFastQuery(tablename: string, sidfieldname: string) {
     `    ${sidfieldname} = nv.${sidfieldname}, ` +
     "    expired = nv.expired, " +
     "    sess = nv.sess " +
+    `    ${extraFieldUpdate}` +
     "  from new_values nv " +
     `  where cs.${sidfieldname} = nv.${sidfieldname} ` +
     "  returning cs.* " +
     ")" +
-    `insert into "${tablename}" (${sidfieldname}, expired, sess) ` +
-    `select ${sidfieldname}, expired, sess ` +
+    `insert into "${tablename}" (${sidfieldname}, expired, sess ${fieldList}) ` +
+    `select ${sidfieldname}, expired, sess ${fieldList}` +
     "from new_values " +
     `where not exists (select 1 from upsert up where up.${sidfieldname} = new_values.${sidfieldname})`
   )
