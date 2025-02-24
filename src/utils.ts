@@ -75,13 +75,14 @@ export function getPostgresFastQuery(
   let dataTypeList = ""
   let extraFieldUpdate = ""
   if (extraFields && extraFields.length == 2) {
-    fieldList = "," + extraFields[0].join(",")
-    dataTypeList = "," + extraFields[1].join(",")
+    extraFields[0] = extraFields[0].map((key) => `"${key}"`);
+    fieldList = ", " + extraFields[0].join(", ")
+    dataTypeList = ", " + extraFields[1].join(", ")
     let tmpExtraFields: Array<string> = []
     extraFields[0].forEach((key) => {
       tmpExtraFields.push(` ${key} = nv.${key}`)
     })
-    extraFieldUpdate = "," + tmpExtraFields.join(",")
+    extraFieldUpdate = ", " + tmpExtraFields.join(", ")
   }
   return (
     `with new_values (${sidfieldname}, expired, sess ${fieldList}) as (` +
