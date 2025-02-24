@@ -21,6 +21,7 @@
     "test": "NODE_OPTIONS=--enable-source-maps node --test",
     "lint": "eslint src/ src/",
     "lint-fix": "eslint --fix src/ test/",
+    "prerelease": "npm run build",
     "release": "release-it",
     "prepare": "husky"
   },
