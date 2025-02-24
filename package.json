@@ -4,7 +4,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "8.0.15",
+  "version": "8.0.16",
   "author": "TJ Holowaychuk <tj@vision-media.ca>",
   "contributors": [
     "Marc Harter <wavded@gmail.com>"
