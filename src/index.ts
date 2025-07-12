@@ -305,10 +305,20 @@ export class RedisStore extends Store {
           })
         }
         // postgresql optimized query
-        await knex.raw(
-          getPostgresFastQuery(tableName, sidFieldName, extrafield),
-          defaultValue,
-        )
+        // add transaction for race condition fix
+        try {
+          await knex.transaction(async (trx) => {
+            await knex
+              .raw(
+                getPostgresFastQuery(tableName, sidFieldName, extrafield),
+                defaultValue,
+              )
+              .transacting(trx)
+          })
+        } catch (error) {
+          // error handler
+          console.error(error)
+        }
       } else if (isMySQL(knex)) {
         await knex.raw(getMysqlFastQuery(tableName, sidFieldName), [
           sid,
