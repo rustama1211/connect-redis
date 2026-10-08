@@ -16,6 +16,9 @@ import {
   timestampTypeName,
 } from "./utils"
 
+// Store callbacks are invoked exactly once and outside of try blocks: an
+// error thrown by the caller's callback must not be caught here and reported
+// back to that same callback as a store error.
 const noop = (_err?: unknown, _data?: any) => {}
 
 interface NormalizedRedisClient {
@@ -180,43 +183,43 @@ export class RedisStore extends Store {
 
   async get(sid: string, cb = noop) {
     let key = this.prefix + sid
+    let sess
     try {
       let data = await this.client.get(key)
       //data = (await this.db_get(key, cb)) as string | null
-      if (!data) return cb()
-      return cb(null, await this.serializer.parse(data))
+      if (data) sess = await this.serializer.parse(data)
     } catch (err) {
       return cb(err)
     }
+    if (!sess) return cb()
+    return cb(null, sess)
   }
 
   async set(sid: string, sess: SessionData, cb = noop) {
     let key = this.prefix + sid
     let ttl = this._getTTL(sess)
+    // an already expired session is removed instead of saved
+    if (ttl <= 0) return this.destroy(sid, cb)
     try {
       let val = this.serializer.stringify(sess)
-      if (ttl > 0) {
-        if (this.disableTTL) {
-          await this.client.set(key, val)
-          await this.db_set(sid, sess)
-        } else {
-          await this.db_set(sid, sess, ttl)
-          await this.client.set(key, val, ttl)
-        }
-        return cb()
+      if (this.disableTTL) {
+        await this.client.set(key, val)
+        await this.db_set(sid, sess)
       } else {
-        await this.db_destroy(sid, cb)
-        return this.destroy(sid, cb)
+        await this.db_set(sid, sess, ttl)
+        await this.client.set(key, val, ttl)
       }
     } catch (err) {
       return cb(err)
     }
+    return cb()
   }
 
   async db_get(
     sid: string,
     callback: (err: any, session?: SessionData | null) => void,
   ) {
+    let session: SessionData | null = null
     try {
       await this.ready
       const {knex, tableName, sidFieldName} = this.options
@@ -228,19 +231,18 @@ export class RedisStore extends Store {
         .where(sidFieldName, "=", sid)
         .andWhereRaw(condition, dateAsISO(knex))
 
-      let session: SessionData | null = null
       if (response[0]) {
         session = response[0].sess
         if (typeof session === "string") {
           session = JSON.parse(session)
         }
       }
-      callback?.(null, session)
-      return session
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.(null, session)
+    return session
   }
 
   async db_set(
@@ -353,12 +355,11 @@ export class RedisStore extends Store {
           }
         })
       }
-
-      callback?.()
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.()
   }
 
   async touch(sid: string, sess: SessionData, cb = noop) {
@@ -366,11 +367,11 @@ export class RedisStore extends Store {
     if (this.disableTouch || this.disableTTL) return cb()
     try {
       await this.client.expire(key, this._getTTL(sess))
-      await this.db_touch(key, sess)
-      return cb()
+      await this.db_touch(sid, sess)
     } catch (err) {
       return cb(err)
     }
+    return cb()
   }
 
   async db_touch(sid: string, session: SessionData, callback?: () => void) {
@@ -394,90 +395,92 @@ export class RedisStore extends Store {
     let key = this.prefix + sid
     try {
       await this.client.del([key])
-      await this.db_destroy(sid, cb)
-      return cb()
+      await this.db_destroy(sid)
     } catch (err) {
       return cb(err)
     }
+    return cb()
   }
 
   async clear(cb = noop) {
     try {
       let keys = await this._getAllKeys()
-      if (!keys.length) return cb()
-      await this.client.del(keys)
-      await this.db_clear(cb)
-      return cb()
+      if (keys.length) {
+        await this.client.del(keys)
+        await this.db_clear()
+      }
     } catch (err) {
       return cb(err)
     }
+    return cb()
   }
 
   async length(cb = noop) {
+    let keys
     try {
-      let keys = await this._getAllKeys()
-      return cb(null, keys.length)
+      keys = await this._getAllKeys()
     } catch (err) {
       return cb(err)
     }
+    return cb(null, keys.length)
   }
 
   async ids(cb = noop) {
     let len = (this.clientPrefix + this.prefix).length
+    let keys
     try {
-      let keys = await this._getAllKeys()
-      return cb(
-        null,
-        keys.map((k) => k.substring(len)),
-      )
+      keys = await this._getAllKeys()
     } catch (err) {
       return cb(err)
     }
+    return cb(
+      null,
+      keys.map((k) => k.substring(len)),
+    )
   }
 
   async all(cb = noop) {
     let len = (this.clientPrefix + this.prefix).length
+    let results: SessionData[] = []
     try {
       let keys = await this._getAllKeys()
-      if (keys.length === 0) return cb(null, [])
-
-      let data = await this.client.mget(keys)
-      let results = data.reduce((acc, raw, idx) => {
-        if (!raw) return acc
-        let sess = this.serializer.parse(raw) as any
-        sess.id = keys[idx].substring(len)
-        acc.push(sess)
-        return acc
-      }, [] as SessionData[])
-      return cb(null, results)
+      if (keys.length) {
+        let data = await this.client.mget(keys)
+        results = data.reduce((acc, raw, idx) => {
+          if (!raw) return acc
+          let sess = this.serializer.parse(raw) as any
+          sess.id = keys[idx].substring(len)
+          acc.push(sess)
+          return acc
+        }, results)
+      }
     } catch (err) {
       return cb(err)
     }
+    return cb(null, results)
   }
 
   async db_destroy(sid: string, callback?: (err?: any) => void) {
+    let retVal
     try {
       await this.ready
       const {knex, tableName, sidFieldName} = this.options
 
-      const retVal = await knex
-        .del()
-        .from(tableName)
-        .where(sidFieldName, "=", sid)
-      callback?.()
-      return retVal
+      retVal = await knex.del().from(tableName).where(sidFieldName, "=", sid)
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.()
+    return retVal
   }
 
   async db_length(callback: (err: any, length?: number) => void) {
+    let length
     try {
       await this.ready
       const {knex, tableName, sidFieldName} = this.options
 
-      let length
       const response = await knex
         .count(`${sidFieldName} as count`)
         .from(tableName)
@@ -485,27 +488,27 @@ export class RedisStore extends Store {
       if (response.length === 1 && "count" in response[0]) {
         length = +(response[0].count ?? 0)
       }
-
-      callback?.(null, length)
-      return length
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.(null, length)
+    return length
   }
 
   async db_clear(callback?: (err?: any) => void) {
+    let res
     try {
       await this.ready
       const {knex, tableName} = this.options
 
-      const res = await knex.del().from(tableName)
-      callback?.()
-      return res
+      res = await knex.del().from(tableName)
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.()
+    return res
   }
 
   async db_all(
@@ -514,6 +517,7 @@ export class RedisStore extends Store {
       obj?: SessionData[] | {[sid: string]: SessionData} | null,
     ) => void,
   ) {
+    let sessions
     try {
       await this.ready
       const {knex, tableName} = this.options
@@ -524,20 +528,19 @@ export class RedisStore extends Store {
         .from(tableName)
         .whereRaw(condition, dateAsISO(knex))
 
-      const sessions = rows.map((row) => {
+      sessions = rows.map((row) => {
         if (typeof row.sess === "string") {
           return JSON.parse(row.sess)
         }
 
         return row.sess
       })
-
-      callback?.(undefined, sessions)
-      return sessions
     } catch (err) {
       callback?.(err)
       throw err
     }
+    callback?.(undefined, sessions)
+    return sessions
   }
 
   private async dbCleanup() {
